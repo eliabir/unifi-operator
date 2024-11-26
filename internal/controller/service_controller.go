@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -46,9 +47,27 @@ type ServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	// _ = log.FromContext(ctx)
+    log := log.FromContext(ctx)
 
-	// TODO(user): your logic here
+    // Get service object
+	var service corev1.Service
+    if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
+        log.Error(err, "unable to fetch Service")
+
+        return ctrl.Result{}, err
+    }
+
+    // Check if service is type loadbalancer
+    if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
+        return ctrl.Result{}, nil
+    }
+
+    if len(service.Status.LoadBalancer.Ingress) > 0 {
+        lbIP := service.Status.LoadBalancer.Ingress[0].IP
+        lbIPmsg := fmt.Sprintf("IP of fetched LoadBalancer service: %s", lbIP)
+        log.Info(lbIPmsg)
+    }
 
 	return ctrl.Result{}, nil
 }
