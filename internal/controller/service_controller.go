@@ -17,20 +17,20 @@ limitations under the License.
 package controller
 
 import (
-	"context"
-	"fmt"
+    "context"
+    "fmt"
 
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+    corev1 "k8s.io/api/core/v1"
+    "k8s.io/apimachinery/pkg/runtime"
+    ctrl "sigs.k8s.io/controller-runtime"
+    "sigs.k8s.io/controller-runtime/pkg/client"
+    "sigs.k8s.io/controller-runtime/pkg/log"
 )
 
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+    client.Client
+    Scheme *runtime.Scheme
 }
 
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
@@ -47,11 +47,11 @@ type ServiceReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.15.0/pkg/reconcile
 func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	// _ = log.FromContext(ctx)
+    // _ = log.FromContext(ctx)
     log := log.FromContext(ctx)
 
     // Get service object
-	var service corev1.Service
+    var service corev1.Service
     if err := r.Get(ctx, req.NamespacedName, &service); err != nil {
         log.Error(err, "unable to fetch Service")
 
@@ -69,12 +69,12 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
         log.Info(lbIPmsg)
     }
 
-	return ctrl.Result{}, nil
+    return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ServiceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&corev1.Service{}).
-		Complete(r)
+    return ctrl.NewControllerManagedBy(mgr).
+        For(&corev1.Service{}).
+        Complete(r)
 }
