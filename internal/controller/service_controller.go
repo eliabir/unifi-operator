@@ -65,7 +65,7 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Check if service has correct label
 	var publicIP string
-	if label, ok := service.Annotations["unifi.example.com/public-ip"]; ok {
+	if label, ok := service.Labels["unifi.example.com/public-ip"]; ok {
 		publicIP = label
 		log.Info(fmt.Sprintf("Public IP: %s", publicIP))
 	} else {
