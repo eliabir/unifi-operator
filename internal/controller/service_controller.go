@@ -63,10 +63,14 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-    // Check if service is type loadbalancer
-    if service.Spec.Type != corev1.ServiceTypeLoadBalancer {
-        return ctrl.Result{}, nil
-    }
+	// Check if service has correct label
+	var publicIP string
+	if label, ok := service.Annotations["unifi.example.com/public-ip"]; ok {
+		publicIP = label
+		log.Info(fmt.Sprintf("Public IP: %s", publicIP))
+	} else {
+		return ctrl.Result{}, nil
+	}
 
 	// Fetch loadbalancerIP
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
