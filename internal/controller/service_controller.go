@@ -73,10 +73,10 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	// Fetch loadbalancerIP
+	var lbIP string
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
-		lbIP := service.Status.LoadBalancer.Ingress[0].IP
-		lbIPmsg := fmt.Sprintf("IP of fetched LoadBalancer service: %s", lbIP)
-		log.Info(lbIPmsg)
+		lbIP = service.Status.LoadBalancer.Ingress[0].IP
+		log.Info(fmt.Sprintf("IP of fetched LoadBalancer service: %s", lbIP))
 	}
 
 	return ctrl.Result{}, nil
