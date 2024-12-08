@@ -31,6 +31,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	"github.com/eliabir/unifi-operator/internal/unifi"
+
 	"github.com/eliabir/unifi-operator/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
@@ -87,9 +89,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create UniFi client
+	setupLog.Info("Setting up UniFi client")
+	unifiClient, err := unifi.CreateUnifiClient()
+	if err != nil {
+		setupLog.Error(err, "failed to create UniFi client")
+		os.Exit(1)
+	}
+
 	if err = (&controller.ServiceReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:      mgr.GetClient(),
+		Scheme:      mgr.GetScheme(),
+		UnifiClient: unifiClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Service")
 		os.Exit(1)
