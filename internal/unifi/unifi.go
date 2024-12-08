@@ -59,7 +59,7 @@ func CreateUnifiClient() (*UnifiClient, error) {
 		return nil, errors.New(fmt.Sprintf("failed to set HTTP client: %s", err))
 	}
 
-	if err := client.Login(context.TODO(), username, password); err != nil {
+	if err := client.Login(context.Background(), username, password); err != nil {
 		return nil, errors.New(fmt.Sprintf("could not log into UniFi controller: %s", err))
 	}
 
