@@ -25,17 +25,24 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
+
+	"github.com/eliabir/unifi-operator/internal/unifi"
 )
 
 // ServiceReconciler reconciles a Service object
 type ServiceReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme      *runtime.Scheme
+	UnifiClient *unifi.UnifiClient
 }
 
 //+kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=core,resources=services/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=core,resources=services/finalizers,verbs=update
+
+const operatorLabelPrefix = "unifi-port-forward"
+
+var operatorLabels []string = []string{"dest-ip", "dest-port", "fwd-port"}
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -63,13 +70,46 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, nil
 	}
 
-	// Check if service has correct label
-	var publicIP string
-	if label, ok := service.Labels["unifi.example.com/public-ip"]; ok {
-		publicIP = label
-		log.Info(fmt.Sprintf("Public IP: %s", publicIP))
-	} else {
-		return ctrl.Result{}, nil
+	portForwardName := fmt.Sprintf("k8s-operator - %s - %s", service.Namespace, service.Name)
+
+	log.Info("Fetching all port forwards")
+	portForwards, err := r.UnifiClient.Client.ListPortForward(context.Background(), r.UnifiClient.SiteID)
+	if err != nil {
+		log.Error(err, "unable to list port forwards")
+
+		return ctrl.Result{}, err
+	}
+
+	deletePortForward := false
+	labelValues := make(map[string]string)
+	for _, label := range operatorLabels {
+		fullLabel := fmt.Sprintf("%s/%s", operatorLabelPrefix, label)
+		if svcLabel, ok := service.Labels[fullLabel]; ok {
+			labelValues[label] = svcLabel
+		} else {
+			deletePortForward = true
+			break
+		}
+	}
+
+	updatePortForward := false
+	for _, portForward := range portForwards {
+		if portForward.Name != portForwardName {
+			continue
+		}
+
+		if deletePortForward {
+			log.Info(fmt.Sprintf("Deleting port forward: %s", portForwardName))
+			return ctrl.Result{}, err
+		}
+
+		if portForward.DestinationIP != labelValues["dest-ip"] || portForward.FwdPort != labelValues["fwd-port"] || portForward.DstPort != labelValues["dest-port"] {
+			updatePortForward = true
+			break
+		} else {
+			log.Info("Port forward is in sync")
+			return ctrl.Result{}, nil
+		}
 	}
 
 	// Fetch loadbalancerIP
@@ -77,6 +117,12 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if len(service.Status.LoadBalancer.Ingress) > 0 {
 		lbIP = service.Status.LoadBalancer.Ingress[0].IP
 		log.Info(fmt.Sprintf("IP of fetched LoadBalancer service: %s", lbIP))
+	}
+
+	if updatePortForward {
+		log.Info(fmt.Sprintf("Updating port forward: %s", portForwardName))
+	} else {
+		log.Info(fmt.Sprintf("Creating port forward: %s", portForwardName))
 	}
 
 	return ctrl.Result{}, nil
