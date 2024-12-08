@@ -27,6 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	"github.com/eliabir/unifi-operator/internal/unifi"
+	goUnifi "github.com/paultyng/go-unifi/unifi"
 )
 
 // ServiceReconciler reconciles a Service object
@@ -69,7 +70,6 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	portForwards, err := r.UnifiClient.Client.ListPortForward(context.Background(), r.UnifiClient.SiteID)
 	if err != nil {
 		log.Error(err, "unable to list port forwards")
-
 		return ctrl.Result{}, err
 	}
 
@@ -86,14 +86,22 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	updatePortForward := false
+	portForwardExists := false
+	var portForwardID string
 	for _, portForward := range portForwards {
 		if portForward.Name != portForwardName {
 			continue
 		}
+		portForwardExists = true
+		portForwardID = portForward.ID
 
 		if deletePortForward {
 			log.Info(fmt.Sprintf("Deleting port forward: %s", portForwardName))
-			return ctrl.Result{}, err
+			if err := r.UnifiClient.Client.DeletePortForward(context.Background(), r.UnifiClient.SiteID, portForwardID); err != nil {
+				log.Error(err, fmt.Sprintf("Failed to delete port forward: %s", portForwardName))
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, nil
 		}
 
 		if portForward.DestinationIP != labelValues["dest-ip"] || portForward.FwdPort != labelValues["fwd-port"] || portForward.DstPort != labelValues["dest-port"] {
@@ -114,8 +122,39 @@ func (r *ServiceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	if updatePortForward {
 		log.Info(fmt.Sprintf("Updating port forward: %s", portForwardName))
-	} else {
+		portForward := &goUnifi.PortForward{
+			Name:          portForwardName,
+			ID:            portForwardID,
+			SiteID:        r.UnifiClient.SiteID,
+			DestinationIP: labelValues["dest-ip"],
+			DstPort:       labelValues["dest-port"],
+			FwdPort:       labelValues["fwd-port"],
+			Fwd:           lbIP,
+		}
+		portForwardResult, err := r.UnifiClient.Client.UpdatePortForward(context.Background(), r.UnifiClient.SiteID, portForward)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Failed to update port forward: %s", portForwardName))
+			return ctrl.Result{}, err
+		}
+		log.Info(fmt.Sprintf("Updated port forward: %s", portForwardResult.Name))
+	} else if !portForwardExists && len(labelValues) == len(operatorLabels) {
 		log.Info(fmt.Sprintf("Creating port forward: %s", portForwardName))
+		portForward := &goUnifi.PortForward{
+			Name:          portForwardName,
+			SiteID:        r.UnifiClient.SiteID,
+			DestinationIP: labelValues["dest-ip"],
+			DstPort:       labelValues["dest-port"],
+			FwdPort:       labelValues["fwd-port"],
+			Fwd:           lbIP,
+		}
+
+		portForwardResult, err := r.UnifiClient.Client.CreatePortForward(context.Background(), r.UnifiClient.SiteID, portForward)
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Failed to create port forward: %s", portForwardName))
+			return ctrl.Result{}, err
+		}
+
+		log.Info(fmt.Sprintf("Created port forward: %s", portForwardResult.Name))
 	}
 
 	return ctrl.Result{}, nil
